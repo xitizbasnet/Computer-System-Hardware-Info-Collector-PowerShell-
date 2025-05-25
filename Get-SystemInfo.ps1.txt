@@ -1,0 +1,58 @@
+# Laptop Serial Number
+$serialNumber = (Get-WmiObject -Class Win32_BIOS).SerialNumber
+
+# Laptop Model Number
+$modelNumber = (Get-WmiObject -Class Win32_ComputerSystem).Model
+
+# Processor Detail
+$processorDetail = (Get-WmiObject -Class Win32_Processor).Name
+
+# Hard Disk Serial Number
+$hardDiskSerialNumber = (Get-WmiObject -Class Win32_DiskDrive).SerialNumber
+
+# Hard Disk Model Number
+$hardDiskModelNumber = (Get-WmiObject -Class Win32_DiskDrive).Model
+
+# Solid State Drive Serial Number
+$ssdSerialNumber = (Get-WmiObject -Class Win32_DiskDrive | Where-Object { $_.MediaType -eq 'SSD' }).SerialNumber
+
+# Solid State Drive Model Number
+$ssdModelNumber = (Get-WmiObject -Class Win32_DiskDrive | Where-Object { $_.MediaType -eq 'SSD' }).Model
+
+# Ethernet MAC Address
+$ethernetMAC = (Get-WmiObject -Class Win32_NetworkAdapter | Where-Object { $_.MACAddress -ne $null -and $_.PhysicalAdapter -eq $true }).MACAddress
+
+# WiFi MAC Address
+$wifiMAC = (Get-WmiObject -Class Win32_NetworkAdapter | Where-Object { $_.MACAddress -ne $null -and $_.NetEnabled -eq $true }).MACAddress
+
+# RAM Capacity
+$ramCapacity = (Get-WmiObject -Class Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1GB
+
+# RAM Speed
+$ramSpeed = (Get-WmiObject -Class Win32_PhysicalMemory | Select-Object -ExpandProperty Speed | Sort-Object -Unique) -join ", "
+
+# Graphics Card Detail
+$graphicsCardDetail = (Get-WmiObject -Class Win32_VideoController | Select-Object -ExpandProperty Caption) -join ", "
+
+# Create an array to hold the attribute-value pairs
+$attributes = @(
+    'Laptop Serial Number:', $serialNumber,
+    'Laptop Model Number:', $modelNumber,
+    'Processor Detail:', $processorDetail,
+    'Hard Disk Serial Number:', $hardDiskSerialNumber,
+    'Hard Disk Model Number:', $hardDiskModelNumber,
+    'Solid State Drive Serial Number:', $ssdSerialNumber,
+    'Solid State Drive Model Number:', $ssdModelNumber,
+    'Ethernet MAC Address:', $ethernetMAC,
+    'WiFi MAC Address:', $wifiMAC,
+    'RAM Capacity (GB):', $ramCapacity,
+    'RAM Speed (MHz):', $ramSpeed,
+    'Graphics Card Detail:', $graphicsCardDetail
+)
+
+# Output the attribute-value pairs side by side
+for ($i = 0; $i -lt $attributes.Count; $i += 2) {
+    $attribute = $attributes[$i]
+    $value = $attributes[$i + 1]
+    Write-Output "$attribute`t$value"
+}
