@@ -24,67 +24,140 @@ This PowerShell script gathers detailed hardware and network information from a 
 # System Hardware Info Collector
 # ===========================
 
+# Basic Info
+$computerName = $env:Computername
+$userName = $env:Username
+
+# System Info
+$system = Get-WmiObject -Class Win32_ComputerSystem
+
+# System Category (1=Desktop, 2=Laptop, 3=Workstation, etc.)
+switch ($system.PCSystemType) {
+    1 { $systemCategory = "Desktop" }
+    2 { $systemCategory = "Laptop" }
+    3 { $systemCategory = "Workstation" }
+    4 { $systemCategory = "Enterprise Server" }
+    5 { $systemCategory = "SOHO Server" }
+    6 { $systemCategory = "Appliance PC" }
+    7 { $systemCategory = "Performance Server" }
+    default { $systemCategory = "Unknown" }
+}
+
+# Computer Manufacturer
+$manufacturer = $system.Manufacturer
+
 # Laptop Serial Number
 $serialNumber = (Get-WmiObject -Class Win32_BIOS).SerialNumber
 
 # Laptop Model Number
-$modelNumber = (Get-WmiObject -Class Win32_ComputerSystem).Model
+$modelNumber = $system.Model
 
 # Processor Detail
 $processorDetail = (Get-WmiObject -Class Win32_Processor).Name
 
-# Hard Disk Serial Number (first detected drive)
-$hardDiskSerialNumber = (Get-WmiObject -Class Win32_DiskDrive)[0].SerialNumber
+# Get all disks
+$disks = Get-WmiObject -Class Win32_DiskDrive
 
-# Hard Disk Model Number
-$hardDiskModelNumber = (Get-WmiObject -Class Win32_DiskDrive)[0].Model
+# HDD Info (exclude SSDs)
+$hdd = $disks | Where-Object { $_.MediaType -ne 'SSD' } | Select-Object -First 1
+if ($hdd) {
+    $hardDiskSerialNumber = $hdd.SerialNumber
+    $hardDiskModelNumber = $hdd.Model
+    $hardDiskSize = "{0:N2} GB" -f ($hdd.Size / 1GB)
+} else {
+    $hardDiskSerialNumber = "Not Detected"
+    $hardDiskModelNumber = "Not Detected"
+    $hardDiskSize = "Not Detected"
+}
 
-# Solid State Drive Details (first detected SSD)
-$ssd = Get-WmiObject -Class Win32_DiskDrive | Where-Object { $_.MediaType -eq 'SSD' }
-$ssdSerialNumber = $ssd.SerialNumber
-$ssdModelNumber = $ssd.Model
+# SSD Info
+$ssd = $disks | Where-Object { $_.MediaType -eq 'SSD' } | Select-Object -First 1
+if ($ssd) {
+    $ssdSerialNumber = $ssd.SerialNumber
+    $ssdModelNumber = $ssd.Model
+    $ssdSize = "{0:N2} GB" -f ($ssd.Size / 1GB)
+} else {
+    $ssdSerialNumber = "Not Detected"
+    $ssdModelNumber = "Not Detected"
+    $ssdSize = "Not Detected"
+}
 
-# Ethernet MAC Address
-$ethernetMAC = (Get-WmiObject -Class Win32_NetworkAdapter | Where-Object {
-    $_.MACAddress -ne $null -and $_.PhysicalAdapter -eq $true
-}).MACAddress
+# Ethernet MAC Address - ORIGINAL CODE PRESERVED
+$ethernetMAC = (Get-WmiObject -Class Win32_NetworkAdapter | Where-Object { $_.MACAddress -ne $null -and $_.PhysicalAdapter -eq $true }).MACAddress
+if (-not $ethernetMAC) { $ethernetMAC = "Not Detected" }
 
-# WiFi MAC Address
-$wifiMAC = (Get-WmiObject -Class Win32_NetworkAdapter | Where-Object {
-    $_.MACAddress -ne $null -and $_.NetEnabled -eq $true
-}).MACAddress
+# WiFi MAC Address - ORIGINAL CODE PRESERVED
+$wifiMAC = (Get-WmiObject -Class Win32_NetworkAdapter | Where-Object { $_.MACAddress -ne $null -and $_.NetEnabled -eq $true }).MACAddress
+if (-not $wifiMAC) { $wifiMAC = "Not Detected" }
 
-# RAM Capacity (in GB)
-$ramCapacity = (Get-WmiObject -Class Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1GB
+# RAM Info
+$physicalMemory = Get-WmiObject -Class Win32_PhysicalMemory
+$ramCapacity = ($physicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1GB
+$ramSpeed = ($physicalMemory | Select-Object -ExpandProperty Speed | Sort-Object -Unique) -join ", "
 
-# RAM Speed (MHz)
-$ramSpeed = (Get-WmiObject -Class Win32_PhysicalMemory | Select-Object -ExpandProperty Speed | Sort-Object -Unique) -join ", "
+# Get first non-empty RAM Manufacturer string
+$ramManufacturer = $physicalMemory | Where-Object { $_.Manufacturer -and $_.Manufacturer.Trim() -ne "" } | Select-Object -ExpandProperty Manufacturer -First 1
+if (-not $ramManufacturer) { $ramManufacturer = "Not Detected" }
 
-# Graphics Card Details
-$graphicsCardDetail = (Get-WmiObject -Class Win32_VideoController | Select-Object -ExpandProperty Caption) -join ", "
+# Format RAM strings with units
+$ramCapacityStr = "{0:N2} GB" -f $ramCapacity
+$ramSpeedStr = $ramSpeed + " MHz"
 
-# Output
+# Graphics Card Detail and VRAM
+$graphicsCards = Get-WmiObject -Class Win32_VideoController
+$graphicsCardDetail = ($graphicsCards | Select-Object -ExpandProperty Caption) -join ", "
+
+# Calculate total graphics memory (sum if multiple GPUs) in GB
+$totalGraphicsMemoryBytes = ($graphicsCards | Measure-Object -Property AdapterRAM -Sum).Sum
+if ($totalGraphicsMemoryBytes -and $totalGraphicsMemoryBytes -gt 0) {
+    $graphicsMemoryGB = "{0:N2} GB" -f ($totalGraphicsMemoryBytes / 1GB)
+} else {
+    $graphicsMemoryGB = "Not Detected"
+}
+
+# Display Size (inches)
+$monitorSizeInfo = Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorBasicDisplayParams | Select-Object -First 1
+
+if ($monitorSizeInfo) {
+    $horizontalSizeCm = $monitorSizeInfo.MaxHorizontalImageSize
+    $verticalSizeCm = $monitorSizeInfo.MaxVerticalImageSize
+    $diagonalSizeInches = [math]::Round( [math]::Sqrt(($horizontalSizeCm * $horizontalSizeCm) + ($verticalSizeCm * $verticalSizeCm)) / 2.54, 1)
+} else {
+    $diagonalSizeInches = "Not Detected"
+}
+
+# Prepare output array
 $attributes = @(
+    'Computer Name:', $computerName,
+    'Username:', $userName,
+    'Computer Manufacturer:', $manufacturer,
+    'System Category:', $systemCategory,
     'Laptop Serial Number:', $serialNumber,
     'Laptop Model Number:', $modelNumber,
     'Processor Detail:', $processorDetail,
-    'Hard Disk Serial Number:', $hardDiskSerialNumber,
-    'Hard Disk Model Number:', $hardDiskModelNumber,
-    'Solid State Drive Serial Number:', $ssdSerialNumber,
-    'Solid State Drive Model Number:', $ssdModelNumber,
+    'HDD Model:', $hardDiskModelNumber,
+    'HDD Size:', $hardDiskSize,
+    'HDD Serial:', $hardDiskSerialNumber,
+    'SSD Model:', $ssdModelNumber,
+    'SSD Size:', $ssdSize,
+    'SSD Serial:', $ssdSerialNumber,
     'Ethernet MAC Address:', $ethernetMAC,
     'WiFi MAC Address:', $wifiMAC,
-    'RAM Capacity (GB):', [math]::Round($ramCapacity, 2),
-    'RAM Speed (MHz):', $ramSpeed,
-    'Graphics Card Detail:', $graphicsCardDetail
+    'RAM Capacity:', $ramCapacityStr,
+    'RAM Speed:', $ramSpeedStr,
+    'RAM Manufacturer:', $ramManufacturer,
+    'Graphics Card Detail:', $graphicsCardDetail,
+    'Graphics Memory (GB):', $graphicsMemoryGB,
+    'Display Size (inches):', $diagonalSizeInches
 )
 
-# Display output
+# Output the attribute-value pairs side by side
 for ($i = 0; $i -lt $attributes.Count; $i += 2) {
     $attribute = $attributes[$i]
     $value = $attributes[$i + 1]
     Write-Output "$attribute`t$value"
 }
+
 ```
 
 ---
