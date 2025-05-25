@@ -6,6 +6,7 @@ This PowerShell script gathers detailed hardware and network information from a 
 
 ## 🔧 Features
 
+* Computer Name and Username
 * Laptop serial and model number
 * Processor name
 * HDD & SSD serial/model numbers
@@ -99,18 +100,27 @@ for ($i = 0; $i -lt $attributes.Count; $i += 2) {
 ## 📋 Output Example
 
 ```
+Computer Name:  GGN215
+Username:       Administrator
+Computer Manufacturer:  LENOVO
+System Category:        Laptop
 Laptop Serial Number:        ABC1234567
 Laptop Model Number:         Dell Latitude 7490
 Processor Detail:            Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz
-Hard Disk Serial Number:     XYZ9876543
-Hard Disk Model Number:      ST500LM034-2E717D
-Solid State Drive Serial Number:    S5DZNF0R123456H
-Solid State Drive Model Number:     Samsung SSD 860 EVO
+HDD Model:      SAMSUNG MZAL4256HBJD-00BL2
+HDD Size:       238.47 GB
+HDD Serial:     0025_38E5_3107_6655.
+SSD Model:      Not Detected
+SSD Size:       Not Detected
+SSD Serial:     Not Detected
 Ethernet MAC Address:        00-1A-2B-3C-4D-5E
 WiFi MAC Address:            00-1B-63-84-45-E6
-RAM Capacity (GB):           16
-RAM Speed (MHz):             2400
+RAM Capacity (GB):           16 GB
+RAM Speed (MHz):             2400 MHz
+RAM Manufacturer:       Samsung
 Graphics Card Detail:        Intel(R) UHD Graphics 620
+Graphics Memory (GB):   0.50 GB
+Display Size (inches):  13.9
 ```
 
 ---
